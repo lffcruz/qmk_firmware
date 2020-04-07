@@ -15,7 +15,9 @@ BOOTLOADER = caterina
 #   comment out to disable the options.
 #
 #BOOTMAGIC_ENABLE = yes	# Virtual DIP switch configuration
-MOUSEKEY_ENABLE = yes	# Mouse keys
+OLED_DRIVER_ENABLE = yes
+ENCODER_ENABLE = yes
+MOUSEKEY_ENABLE = no	# Mouse keys
 EXTRAKEY_ENABLE = yes	# Audio control and System control
 CONSOLE_ENABLE = yes	# Console for debug
 COMMAND_ENABLE = yes   # Commands for debug and configuration

@@ -1,15 +1,15 @@
 /* Copyright 2017 Mattia Dal Ben
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -23,13 +23,22 @@
 #define VENDOR_ID       0xFEED
 #define PRODUCT_ID      0x6060
 #define DEVICE_VER      0x0001
-#define MANUFACTURER    Mattia Dal Ben
-#define PRODUCT         Redox_wireless
-#define DESCRIPTION     q.m.k. keyboard firmware for Redox-w
+#define MANUFACTURER    Luis Cruz
+#define PRODUCT         Redox_wireless_basepad
+#define DESCRIPTION     q.m.k. keyboard firmware for Redox-w-bp
 
 /* key matrix size */
 #define MATRIX_ROWS 5
-#define MATRIX_COLS 14
+#define MATRIX_COLS 16
+
+/* Pad matrix pins on arduino */
+#define PAD_MATRIX_KEYS 9
+#define PAD_MATRIX_PINS { B6, B5, B2, B4, B3, E6, B1, D7, F7 }
+#define UNUSED_PINS
+
+
+/* Debounce reduces chatter (unintended double-presses) - set 0 if debouncing is not needed */
+#define DEBOUNCE 5
 
 /* define if matrix has ghost */
 //#define MATRIX_HAS_GHOST
@@ -38,6 +47,10 @@
 //#define BACKLIGHT_LEVELS 3
 
 #define ONESHOT_TIMEOUT 500
+
+#define ENCODERS_PAD_A { D4 }
+#define ENCODERS_PAD_B { C6 }
+#define ENCODER_RESOLUTION 4
 
 /*
  * Feature disable options

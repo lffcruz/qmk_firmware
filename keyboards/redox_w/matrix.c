@@ -24,6 +24,8 @@
 #include "util.h"
 #include "matrix.h"
 #include "timer.h"
+#include "debounce.h"
+#include "quantum.h"
 
 #if (MATRIX_COLS <= 8)
 #    define print_matrix_header()  print("\nr/c 01234567\n")
@@ -42,7 +44,10 @@
 #    define ROW_SHIFTER  ((uint32_t)1)
 #endif
 
+static const pin_t pad_pins[PAD_MATRIX_KEYS] =  PAD_MATRIX_PINS;
+
 /* matrix state(1:on, 0:off) */
+static matrix_row_t raw_matrix[MATRIX_ROWS]; //raw values
 static matrix_row_t matrix[MATRIX_ROWS];
 
 __attribute__ ((weak))
@@ -83,52 +88,6 @@ uint8_t matrix_cols(void) {
     return MATRIX_COLS;
 }
 
-void matrix_init(void) {
-
-    matrix_init_quantum();
-}
-
-uint8_t matrix_scan(void)
-{
-    SERIAL_UART_INIT();
-
-    uint32_t timeout = 0;
-
-    //the s character requests the RF slave to send the matrix
-    SERIAL_UART_DATA = 's';
-
-    //trust the external keystates entirely, erase the last data
-    uint8_t uart_data[11] = {0};
-
-    //there are 14 bytes corresponding to 14 columns, and an end byte
-    for (uint8_t i = 0; i < 11; i++) {
-        //wait for the serial data, timeout if it's been too long
-        //this only happened in testing with a loose wire, but does no
-        //harm to leave it in here
-        while(!SERIAL_UART_RXD_PRESENT){
-            timeout++;
-            if (timeout > 10000){
-                break;
-            }
-        }
-        uart_data[i] = SERIAL_UART_DATA;
-    }
-
-    //check for the end packet, the key state bytes use the LSBs, so 0xE0
-    //will only show up here if the correct bytes were recieved
-    if (uart_data[10] == 0xE0)
-    {
-        //shifting and transferring the keystates to the QMK matrix variable
-        for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
-            matrix[i] = (uint16_t) uart_data[i*2] | (uint16_t) uart_data[i*2+1] << 7;
-        }
-    }
-
-
-    matrix_scan_quantum();
-    return 1;
-}
-
 inline
 bool matrix_is_on(uint8_t row, uint8_t col)
 {
@@ -159,4 +118,106 @@ uint8_t matrix_key_count(void)
         count += matrix_bitpop(i);
     }
     return count;
+}
+
+static void init_pins(void)
+{
+    for(uint8_t x = 0; x < PAD_MATRIX_KEYS; x++) {
+        setPinInputHigh(pad_pins[x]);
+    }
+}
+
+void matrix_init(void)
+{
+    // initialize pad pins
+    init_pins();
+
+    // initialize matrix state: all keys off
+    for (uint8_t i=0; i < MATRIX_ROWS; i++) {
+        raw_matrix[i] = 0;
+        matrix[i] = 0;
+    }
+
+    debounce_init(MATRIX_ROWS);
+
+    matrix_init_quantum();
+}
+
+uint8_t pad_matrix_scan(void)
+{
+    bool matrix_changed = false;
+
+    // Select col and wait for col selection to stabilize
+
+    // For each row...
+    for(uint8_t row_index = 0; row_index < MATRIX_ROWS-1; row_index++)
+    {
+        // Store last value of row prior to reading
+        matrix_row_t last_value = raw_matrix[row_index];
+
+        raw_matrix[row_index] = (raw_matrix[row_index] & ~(1 << 14)) | (!readPin(pad_pins[row_index*2]) << 14);
+        raw_matrix[row_index] = (raw_matrix[row_index] & ~(1 << 15)) | (!readPin(pad_pins[(row_index*2)+1]) << 15);
+
+        // Determine if the matrix changed state
+        if ((last_value != raw_matrix[row_index]) && !(matrix_changed))
+        {
+            matrix_changed = true;
+        }
+    }
+
+    // read last isolated keys
+    matrix_row_t last_value = raw_matrix[MATRIX_ROWS-1];
+    raw_matrix[MATRIX_ROWS-1] = (raw_matrix[MATRIX_ROWS-1] & ~(1 << 14)) | (!readPin(pad_pins[PAD_MATRIX_KEYS-1]) << 14);
+
+    // Determine if the matrix changed state
+    if ((last_value != raw_matrix[MATRIX_ROWS-1]) && !(matrix_changed))
+    {
+        matrix_changed = true;
+    }
+
+    return (uint8_t)matrix_changed;
+}
+
+uint8_t matrix_scan(void)
+{
+    bool changed = false;
+
+    SERIAL_UART_INIT();
+
+    //the s character requests the RF slave to send the matrix
+    SERIAL_UART_DATA = 's';
+
+    //trust the external keystates entirely, erase the last data
+    uint8_t uart_data[11] = {0};
+
+    //there are 14 bytes corresponding to 14 columns, and an end byte
+    for (uint8_t i = 0; i < 11; i++) {
+        //wait for the serial data, timeout if it's been too long
+        //this only happened in testing with a loose wire, but does no
+        //harm to leave it in here
+        //while(!SERIAL_UART_RXD_PRESENT){
+        //    timeout++;
+        //    if (timeout > 10000){
+        //        break;
+        //    }
+        //}
+        uart_data[i] = SERIAL_UART_DATA;
+    }
+
+    //check for the end packet, the key state bytes use the LSBs, so 0xE0
+    //will only show up here if the correct bytes were recieved
+    if (uart_data[10] == 0xE0)
+    {
+        //shifting and transferring the keystates to the QMK matrix variable
+        for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
+            raw_matrix[i] = (uint16_t) uart_data[i*2] | (uint16_t) uart_data[i*2+1] << 7;
+        }
+        changed = true;
+    }
+
+    changed = (changed || pad_matrix_scan());
+
+    debounce(raw_matrix, matrix, MATRIX_ROWS, changed);
+    matrix_scan_quantum();
+    return (uint8_t)changed;
 }
