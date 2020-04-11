@@ -36,10 +36,6 @@
 #define PAD_MATRIX_PINS { B6, B5, B2, B4, B3, E6, B1, D7, F7 }
 #define UNUSED_PINS
 
-
-/* Debounce reduces chatter (unintended double-presses) - set 0 if debouncing is not needed */
-#define DEBOUNCE 5
-
 /* define if matrix has ghost */
 //#define MATRIX_HAS_GHOST
 

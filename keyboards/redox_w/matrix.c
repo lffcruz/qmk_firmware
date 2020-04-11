@@ -24,7 +24,6 @@
 #include "util.h"
 #include "matrix.h"
 #include "timer.h"
-#include "debounce.h"
 #include "quantum.h"
 
 #if (MATRIX_COLS <= 8)
@@ -47,7 +46,6 @@
 static const pin_t pad_pins[PAD_MATRIX_KEYS] =  PAD_MATRIX_PINS;
 
 /* matrix state(1:on, 0:off) */
-static matrix_row_t raw_matrix[MATRIX_ROWS]; //raw values
 static matrix_row_t matrix[MATRIX_ROWS];
 
 __attribute__ ((weak))
@@ -134,55 +132,34 @@ void matrix_init(void)
 
     // initialize matrix state: all keys off
     for (uint8_t i=0; i < MATRIX_ROWS; i++) {
-        raw_matrix[i] = 0;
         matrix[i] = 0;
     }
-
-    debounce_init(MATRIX_ROWS);
 
     matrix_init_quantum();
 }
 
 uint8_t pad_matrix_scan(void)
 {
-    bool matrix_changed = false;
-
     // Select col and wait for col selection to stabilize
 
     // For each row...
     for(uint8_t row_index = 0; row_index < MATRIX_ROWS-1; row_index++)
     {
-        // Store last value of row prior to reading
-        matrix_row_t last_value = raw_matrix[row_index];
-
-        raw_matrix[row_index] = (raw_matrix[row_index] & ~(1 << 14)) | (!readPin(pad_pins[row_index*2]) << 14);
-        raw_matrix[row_index] = (raw_matrix[row_index] & ~(1 << 15)) | (!readPin(pad_pins[(row_index*2)+1]) << 15);
-
-        // Determine if the matrix changed state
-        if ((last_value != raw_matrix[row_index]) && !(matrix_changed))
-        {
-            matrix_changed = true;
-        }
+        matrix[row_index] = (matrix[row_index] & ~(1 << 14)) | (!readPin(pad_pins[row_index*2]) << 14);
+        matrix[row_index] = (matrix[row_index] & ~(1 << 15)) | (!readPin(pad_pins[(row_index*2)+1]) << 15);
     }
 
     // read last isolated keys
-    matrix_row_t last_value = raw_matrix[MATRIX_ROWS-1];
-    raw_matrix[MATRIX_ROWS-1] = (raw_matrix[MATRIX_ROWS-1] & ~(1 << 14)) | (!readPin(pad_pins[PAD_MATRIX_KEYS-1]) << 14);
+    matrix[MATRIX_ROWS-1] = (matrix[MATRIX_ROWS-1] & ~(1 << 14)) | (!readPin(pad_pins[PAD_MATRIX_KEYS-1]) << 14);
 
-    // Determine if the matrix changed state
-    if ((last_value != raw_matrix[MATRIX_ROWS-1]) && !(matrix_changed))
-    {
-        matrix_changed = true;
-    }
-
-    return (uint8_t)matrix_changed;
+    return (uint8_t)1;
 }
 
 uint8_t matrix_scan(void)
 {
-    bool changed = false;
-
     SERIAL_UART_INIT();
+
+    uint32_t timeout = 0;
 
     //the s character requests the RF slave to send the matrix
     SERIAL_UART_DATA = 's';
@@ -195,12 +172,15 @@ uint8_t matrix_scan(void)
         //wait for the serial data, timeout if it's been too long
         //this only happened in testing with a loose wire, but does no
         //harm to leave it in here
-        //while(!SERIAL_UART_RXD_PRESENT){
-        //    timeout++;
-        //    if (timeout > 10000){
-        //        break;
-        //    }
-        //}
+
+        while(!SERIAL_UART_RXD_PRESENT){
+            timeout++;
+            if (timeout > 10000){
+                break;
+            }
+        }
+
+
         uart_data[i] = SERIAL_UART_DATA;
     }
 
@@ -210,14 +190,13 @@ uint8_t matrix_scan(void)
     {
         //shifting and transferring the keystates to the QMK matrix variable
         for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
-            raw_matrix[i] = (uint16_t) uart_data[i*2] | (uint16_t) uart_data[i*2+1] << 7;
+            matrix[i] = (uint16_t) uart_data[i*2] | (uint16_t) uart_data[i*2+1] << 7;
         }
-        changed = true;
     }
 
-    changed = (changed || pad_matrix_scan());
+    pad_matrix_scan();
 
-    debounce(raw_matrix, matrix, MATRIX_ROWS, changed);
     matrix_scan_quantum();
-    return (uint8_t)changed;
+    return (uint8_t)1;
 }
+
