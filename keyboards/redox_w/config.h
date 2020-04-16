@@ -48,6 +48,8 @@
 #define ENCODERS_PAD_B { C6 }
 #define ENCODER_RESOLUTION 4
 
+#define OLED_FONT_H "keyboards/redox_w/keymaps/default/glcdfont.c"
+
 /*
  * Feature disable options
  *  These options are also useful to firmware size reduction.
