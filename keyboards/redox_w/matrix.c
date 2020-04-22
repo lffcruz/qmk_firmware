@@ -45,6 +45,8 @@
 
 static const pin_t pad_pins[PAD_MATRIX_KEYS] =  PAD_MATRIX_PINS;
 
+static int32_t timeout_key = 0;
+
 /* matrix state(1:on, 0:off) */
 static matrix_row_t matrix[MATRIX_ROWS];
 
@@ -195,6 +197,28 @@ uint8_t matrix_scan(void)
     }
 
     pad_matrix_scan();
+
+    uint32_t matrix_count = 0;
+    for (uint8_t i = 0; i < MATRIX_ROWS; i++) {
+            matrix_count += matrix[i];
+    }
+
+    if(matrix_count == 0)
+    {
+        if (timeout_key > 10000)
+        {
+            oled_off();
+        }
+        else
+        {
+            timeout_key++;
+        }
+    }
+    else
+    {
+        timeout_key = 0;
+        oled_on();
+    }
 
     matrix_scan_quantum();
     return (uint8_t)1;
